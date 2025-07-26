@@ -19,7 +19,9 @@ import sys
 sys.path.append(os.path.dirname(__file__))
 
 from algorithms.standard_lloyd import StandardLloydAlgorithm
-from algorithms.capacity_constrained import CapacityConstrainedDistributionAlgorithm
+from algorithms.capacity_constrained import (CapacityConstrainedDistributionAlgorithm, 
+                                            CapacityConstrainedVoronoiAlgorithm,
+                                            OptimizedCapacityConstrainedVoronoiAlgorithm)
 from utils import get_example_density_functions
 
 def ensure_output_dir():
@@ -161,23 +163,116 @@ def run_capacity_constrained(n_generators=20, density_name='multi_gaussian',
     
     return final_points, density_func
 
+def run_exact_paper_algorithm(n_generators=20, density_name='multi_gaussian', n_iterations=50):
+    """Run Exact Paper Algorithm (Optimized Capacity-Constrained Voronoi) and export results."""
+    print(f"\n{'='*70}")
+    print("EXACT PAPER ALGORITHM (OPTIMIZED CAPACITY-CONSTRAINED VORONOI)")
+    print('='*70)
+    
+    # Setup with optimized version for better performance
+    domain = (0, 1, 0, 1)
+    algorithm = OptimizedCapacityConstrainedVoronoiAlgorithm(domain)
+    
+    # Get density function
+    density_funcs = get_example_density_functions()
+    density_func = density_funcs[density_name]
+    
+    # Generate initial points
+    np.random.seed(42)
+    initial_points = algorithm.generate_random_points(n_generators)
+    
+    print(f"Generators: {n_generators}")
+    print(f"Density: {density_name}")
+    print(f"Iterations: {n_iterations}")
+    print(f"Version: OPTIMIZED (for speed)")
+    print("-" * 50)
+    
+    # Run optimized algorithm
+    final_points, energy_history, capacity_variance_history = algorithm.run(
+        initial_points,
+        density_func,
+        n_iterations=n_iterations,
+        verbose=True
+    )
+    
+    print(f"Final energy: {energy_history[-1]:.6f}")
+    print(f"Final capacity variance: {capacity_variance_history[-1]:.6f}")
+    
+    return final_points, density_func
+
+def run_original_paper_algorithm(n_generators=20, density_name='multi_gaussian', n_iterations=20):
+    """Run Original Paper Algorithm (Exact but Slow) - for comparison only."""
+    print(f"\n{'='*70}")
+    print("ORIGINAL PAPER ALGORITHM (EXACT BUT SLOW - FOR COMPARISON)")
+    print('='*70)
+    print("⚠️  WARNING: This is the exact implementation and will be VERY slow!")
+    print("   Recommended for research/comparison with small datasets only.")
+    
+    # Setup with original slow version
+    domain = (0, 1, 0, 1)
+    algorithm = CapacityConstrainedVoronoiAlgorithm(domain)
+    
+    # Get density function
+    density_funcs = get_example_density_functions()
+    density_func = density_funcs[density_name]
+    
+    # Generate initial points
+    np.random.seed(42)
+    initial_points = algorithm.generate_random_points(n_generators)
+    
+    print(f"Generators: {n_generators}")
+    print(f"Density: {density_name}")
+    print(f"Iterations: {n_iterations} (reduced for speed)")
+    print(f"Version: ORIGINAL (exact but slow)")
+    print("-" * 50)
+    
+    # Run original algorithm with reduced iterations
+    final_points, energy_history, capacity_variance_history = algorithm.run(
+        initial_points,
+        density_func,
+        n_iterations=n_iterations,
+        sample_density=5000,  # Reduced for speed
+        verbose=True
+    )
+    
+    print(f"Final energy: {energy_history[-1]:.6f}")
+    print(f"Final capacity variance: {capacity_variance_history[-1]:.6f}")
+    
+    return final_points, density_func
+
 def main():
     """Main interface for running algorithms and exporting results."""
     output_dir = ensure_output_dir()
     
-    print("="*60)
+    print("\n" + "="*80)
     print("POINT DISTRIBUTION ALGORITHMS WITH VORONOI EXPORT")
-    print("="*60)
-    print("Choose algorithm:")
-    print("1. Standard Lloyd Algorithm")
-    print("2. Capacity-Constrained Distribution Algorithm")
-    print("3. Both Algorithms")
-    print("0. Exit")
-    print("="*60)
+    print("="*80)
     
     while True:
+        # Display menu options for each iteration
+        print("\nChoose algorithm:")
+        print()
+        print("1. Standard Lloyd Algorithm")
+        print("   └─ Classic CVT algorithm for energy minimization")
+        print()
+        print("2. Capacity-Constrained Distribution Algorithm") 
+        print("   └─ Blue noise algorithm with capacity constraints")
+        print()
+        print("3. Exact Paper Algorithm (Optimized)")
+        print("   └─ Fast implementation of heap-based paper algorithm")
+        print()
+        print("4. Original Paper Algorithm (Slow - Comparison Only)")
+        print("   └─ Exact but very slow implementation for research")
+        print()
+        print("5. All Fast Algorithms")
+        print("   └─ Run algorithms 1, 2, and 3 with same parameters")
+        print()
+        print("0. Exit")
+        print()
+        print("="*80)
+        
         try:
-            choice = input("\nEnter your choice (0-3): ").strip()
+            choice = input("\nEnter your choice (0-5): ").strip()
             
             if choice == '0':
                 print("Goodbye!")
@@ -189,11 +284,11 @@ def main():
                 n_iterations = int(input("Number of iterations (default 50): ") or "50")
                 
                 print("\nDensity options:")
-                print("1. Uniform")
-                print("2. Gaussian") 
-                print("3. Multi-Gaussian (default)")
-                print("4. Linear")
-                density_choice = input("Choose density (1-4, default 3): ").strip() or "3"
+                print("1. Uniform       - Even distribution across domain")
+                print("2. Gaussian      - Single centered peak")
+                print("3. Multi-Gaussian - Multiple peaks (default)")
+                print("4. Linear        - Linear gradient")
+                density_choice = input("\nChoose density (1-4, default 3): ").strip() or "3"
                 
                 density_map = {'1': 'uniform', '2': 'gaussian', '3': 'multi_gaussian', '4': 'linear'}
                 density_name = density_map.get(density_choice, 'multi_gaussian')
@@ -215,6 +310,7 @@ def main():
                 create_voronoi_png(final_points, png_file, 
                                  f"Standard Lloyd - {density_name.replace('_', ' ').title()}", 
                                  density_func)
+                print(f"\n✅ Standard Lloyd completed! Files: {base_name}.txt/.png")
             
             elif choice == '2':
                 # Capacity-Constrained
@@ -235,9 +331,45 @@ def main():
                 create_voronoi_png(final_points, png_file, 
                                  f"Capacity-Constrained - {density_name.replace('_', ' ').title()}", 
                                  density_func)
+                print(f"\n✅ Capacity-Constrained completed! Files: {base_name}.txt/.png")
             
             elif choice == '3':
-                # Both algorithms
+                # Exact Paper Algorithm
+                final_points, density_func = run_exact_paper_algorithm(n_generators, density_name, n_iterations)
+                
+                # Export files
+                base_name = f"optimized_paper_{density_name}_{n_generators}pts"
+                txt_file = os.path.join(output_dir, f"{base_name}.txt")
+                png_file = os.path.join(output_dir, f"{base_name}_voronoi.png")
+                
+                save_points_to_txt(final_points, txt_file, "Exact Paper Algorithm (Optimized)")
+                create_voronoi_png(final_points, png_file, 
+                                 f"Exact Paper Algorithm (Optimized) - {density_name.replace('_', ' ').title()}", 
+                                 density_func)
+                print(f"\n✅ Optimized Paper Algorithm completed! Files: {base_name}.txt/.png")
+            
+            elif choice == '4':
+                # Original Paper Algorithm (Slow)
+                confirm = input("⚠️  This is the SLOW original implementation. Continue? (y/N): ").strip().lower()
+                if confirm != 'y':
+                    print("Cancelled. Use option 3 for the fast optimized version.")
+                    continue
+                
+                final_points, density_func = run_original_paper_algorithm(n_generators, density_name, 20)  # Reduced iterations
+                
+                # Export files
+                base_name = f"original_paper_{density_name}_{n_generators}pts"
+                txt_file = os.path.join(output_dir, f"{base_name}.txt")
+                png_file = os.path.join(output_dir, f"{base_name}_voronoi.png")
+                
+                save_points_to_txt(final_points, txt_file, "Original Paper Algorithm (Exact but Slow)")
+                create_voronoi_png(final_points, png_file, 
+                                 f"Original Paper Algorithm - {density_name.replace('_', ' ').title()}", 
+                                 density_func)
+                print(f"\n✅ Original Paper Algorithm completed! Files: {base_name}.txt/.png")
+            
+            elif choice == '5':
+                # All fast algorithms
                 try:
                     blue_noise_weight = float(input("Blue noise weight for capacity-constrained (0.0-1.0, default 0.5): ") or "0.5")
                 except ValueError:
@@ -269,16 +401,33 @@ def main():
                                  f"Capacity-Constrained - {density_name.replace('_', ' ').title()}", 
                                  density_func)
                 
-                print(f"\n{'='*60}")
-                print("BOTH ALGORITHMS COMPLETED")
-                print(f"All files saved to: {output_dir}")
-                print("="*60)
+                # Optimized Paper Algorithm
+                final_points_paper, _ = run_exact_paper_algorithm(n_generators, density_name, n_iterations)
+                
+                # Export Optimized Paper Algorithm files
+                base_name_paper = f"optimized_paper_{density_name}_{n_generators}pts"
+                txt_file_paper = os.path.join(output_dir, f"{base_name_paper}.txt")
+                png_file_paper = os.path.join(output_dir, f"{base_name_paper}_voronoi.png")
+                
+                save_points_to_txt(final_points_paper, txt_file_paper, "Optimized Paper Algorithm")
+                create_voronoi_png(final_points_paper, png_file_paper, 
+                                 f"Optimized Paper Algorithm - {density_name.replace('_', ' ').title()}", 
+                                 density_func)
+                
+                print(f"\n{'='*80}")
+                print("🎉 ALL FAST ALGORITHMS COMPLETED SUCCESSFULLY!")
+                print(f"📁 All files saved to: {output_dir}")
+                print("📊 Generated files: TXT (coordinates) + PNG (Voronoi diagrams)")
+                print("="*80)
             
             else:
-                print("Invalid choice. Please try again.")
+                print("\n❌ Invalid choice. Please try again.")
+                print("Valid options: 0 (Exit), 1 (Lloyd), 2 (Capacity-Constrained),")
+                print("               3 (Optimized Paper), 4 (Original Paper), 5 (All Fast)")
             
-            print(f"\nResults saved to: {output_dir}")
-            print("="*60)
+            if choice != '0':
+                print(f"\n✅ Results saved to: {output_dir}")
+                print("="*80)
             
         except KeyboardInterrupt:
             print("\nOperation cancelled.")

@@ -267,12 +267,15 @@ def main():
         print("5. All Fast Algorithms")
         print("   └─ Run algorithms 1, 2, and 3 with same parameters")
         print()
+        print("6. Image Stippling")
+        print("   └─ Create stippling effects from images (like paper examples)")
+        print()
         print("0. Exit")
         print()
         print("="*80)
         
         try:
-            choice = input("\nEnter your choice (0-5): ").strip()
+            choice = input("\nEnter your choice (0-6): ").strip()
             
             if choice == '0':
                 print("Goodbye!")
@@ -420,10 +423,35 @@ def main():
                 print("📊 Generated files: TXT (coordinates) + PNG (Voronoi diagrams)")
                 print("="*80)
             
+            elif choice == '6':
+                # Image Stippling
+                print(f"\n{'='*80}")
+                print("🎨 IMAGE STIPPLING MODE")
+                print("="*80)
+                print("Launching image stippling interface...")
+                print("This will run the dedicated image stippling tool.")
+                print()
+                
+                # Import and run the image stippling main function
+                try:
+                    import subprocess
+                    result = subprocess.run([
+                        sys.executable, 'image_stippling.py'
+                    ], cwd=os.path.dirname(__file__))
+                    
+                    if result.returncode == 0:
+                        print("\n✅ Image stippling session completed!")
+                    else:
+                        print("\n⚠️  Image stippling session ended.")
+                        
+                except Exception as e:
+                    print(f"\n❌ Error launching image stippling: {e}")
+                    print("You can run image stippling directly with: python image_stippling.py")
+            
             else:
                 print("\n❌ Invalid choice. Please try again.")
                 print("Valid options: 0 (Exit), 1 (Lloyd), 2 (Capacity-Constrained),")
-                print("               3 (Optimized Paper), 4 (Original Paper), 5 (All Fast)")
+                print("               3 (Optimized Paper), 4 (Original Paper), 5 (All Fast), 6 (Image Stippling)")
             
             if choice != '0':
                 print(f"\n✅ Results saved to: {output_dir}")

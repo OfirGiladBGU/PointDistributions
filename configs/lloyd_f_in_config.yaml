@@ -1,0 +1,6 @@
+# Configuration for F_in.png stippling using Lloyd algorithm
+image: "input/F_in.png"
+algorithm: "lloyd"
+points: 15000
+output_dir: "output"
+description: "Lloyd algorithm for F_in.png (15,000 points)"

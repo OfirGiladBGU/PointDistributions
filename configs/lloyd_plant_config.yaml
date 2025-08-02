@@ -1,0 +1,6 @@
+# Configuration for Plant.png stippling using Standard Lloyd algorithm
+image: "input/Plant.png"
+algorithm: "lloyd"
+points: 20000
+output_dir: "output"
+description: "Lloyd algorithm for Plant.png (20,000 points)"

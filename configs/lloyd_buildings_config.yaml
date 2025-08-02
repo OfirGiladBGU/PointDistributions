@@ -1,0 +1,6 @@
+# Configuration for Buildings.png stippling using Standard Lloyd algorithm
+image: "input/Buildings.png"
+algorithm: "lloyd"
+points: 3000
+output_dir: "output"
+description: "Lloyd algorithm for Buildings.png (3,000 points)"

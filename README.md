@@ -1,213 +1,272 @@
 # Point Distribution Algorithms
 
-(Based on: [ccvt](https://github.com/Atrix256/ccvt))
+## Source:
 
-A comprehensive implementation of Capacity-Constrained Voronoi Tessellation (CCVT) for image stippling and point distribution.
+Based on: [ccvt](https://github.com/Atrix256/ccvt)
 
-## 🎯 Main Features
+## Description
 
-- **Ultra-Targeted CCVT**: Advanced image stippling algorithm that properly concentrates points on subjects
-- **Adaptive Processing**: Automatically detects and handles different image types (architectural, organic, etc.)
-- **High-Quality Output**: Generates artistic stippling effects similar to hand-drawn illustrations
-- **Export Capabilities**: Point coordinates, visualizations, and analysis tools
+A clean implementation of stippling algorithms for artistic point distribution visualization, featuring both **CCVT (Capacity-Constrained Voronoi Tessellation)** and **Lloyd** algorithms with optimized visualization output.
+
+## 🎯 Overview
+
+This project implements two high-quality point distribution algorithms:
+- **CCVT**: Capacity-constrained algorithm from **Balzer2009: Capacity-constrained Point Distributions**
+- **Lloyd**: Standard Lloyd relaxation algorithm for comparison
+
+Both algorithms produce identical output formats with clean visualizations and comprehensive coordinate data.
 
 ## 🚀 Quick Start
 
-### Simple Usage
+### Using Preset Configurations
 
 ```bash
-# Stipple any image
-python ccvt_stippling.py sample_output/Plant.png
+# CCVT algorithm examples
+python run.py configs/ccvt_plant_config.yaml      # Plant image (20,000 points)
+python run.py configs/ccvt_buildings_config.yaml  # Buildings image (3,000 points)
+python run.py configs/ccvt_f_in_config.yaml       # F_in image (15,000 points)
 
-# Customize parameters  
-python ccvt_stippling.py sample_output/Buildings.png -s 800 -p 10000 -i 20
+# Lloyd algorithm examples  
+python run.py configs/lloyd_plant_config.yaml     # Plant image (20,000 points)
+python run.py configs/lloyd_buildings_config.yaml # Buildings image (3,000 points)
+python run.py configs/lloyd_f_in_config.yaml      # F_in image (15,000 points)
+
+# Quick demo
+python demo_stippling.py
 ```
 
-### Python API
+### Creating Custom Configurations
 
-```python
-from ccvt_stippling import create_ccvt_stippling
+```bash
+# Generate template
+python run.py --create-sample
 
-# Generate stippling for an image
-sites, points = create_ccvt_stippling("my_image.png", num_sites=600)
+# Edit sample_config.yaml with your settings
+python run.py sample_config.yaml
 ```
 
 ## 📁 Project Structure
 
-### Main Scripts (Production Ready)
-- `ccvt_stippling.py` - **Main entry point** for creating stippling
-- `ultra_targeted_flower.py` - Core algorithm for adaptive density detection  
-- `paper_accurate_ccvt.py` - Research paper implementation
-- `run_algorithms.py` - Batch processing and comparison tools
-- `run_optimized_ccvt.py` - Speed-optimized version
-
-### Development & Testing
-- `test/` - All test scripts, validation tools, and experimental code (git ignored)
-- `sample_output/` - Sample images for testing
-- `output/` - Generated stippling results
-- `utils/` - Utility functions and helpers
-
-## 🎨 Examples
-   ```bash
-   python image_stippling.py
-   ```
-
-## 🎨 Image Stippling
-
-Transform any image into artistic stippling effects, similar to the results shown in the research paper!
-
-**What is Image Stippling?**
-- **Dark areas** receive more points (high density)
-- **Light areas** receive fewer points (low density)  
-- Overall visual structure is preserved through intelligent point placement
-- Results can be used for artistic effects, printing, or further processing
-
-**Key Features:**
-- **Supported formats**: PNG, JPG, JPEG, BMP, TIFF, GIF
-- **Multiple algorithms**: Lloyd, Capacity-Constrained, Optimized Paper
-- **Customizable parameters**: Point density, blur, color inversion
-- **High-quality output**: Both coordinates and visual results
-
-**Quick Start:**
-```bash
-# Method 1: From main interface
-python run_algorithms.py
-# Choose option 6: Image Stippling
-
-# Method 2: Direct stippling tool
-python image_stippling.py
-
-# Method 3: Create test images first
-python create_sample_images.py
-python image_stippling.py
-```
-
-**Algorithm Recommendations:**
-- **Standard Lloyd**: Even distribution, smooth results
-- **Capacity-Constrained**: Blue noise effects, artistic variation  
-- **Optimized Paper**: Best balance of quality and speed (recommended)
-
-**Parameter Guidelines:**
-- **Points**: 2,000-5,000 (simple), 5,000-15,000 (detailed), 15,000+ (very detailed)
-- **Iterations**: 30-50 (balanced), 50-100 (higher quality)
-- **Blur sigma**: 0 (no smoothing), 0.5-1.0 (light), 1.0-3.0 (heavy smoothing)
-
-## Usage
-
-The main tool provides a menu interface:
-
-1. **Standard Lloyd Algorithm** - Classic CVT algorithm
-2. **Capacity-Constrained Distribution** - Blue noise algorithm  
-3. **Exact Paper Algorithm (Optimized)** - Fast heap-based algorithm
-4. **Original Paper Algorithm (Slow)** - Research comparison version
-5. **All Fast Algorithms** - Run algorithms 1, 2, and 3 with same parameters
-6. **🆕 Image Stippling** - Create artistic stippling from images
-0. **Exit**
-
-### Parameters
-
-- **Number of generators**: How many points to distribute
-- **Number of iterations**: Algorithm iterations (default: 50)
-- **Density function**: Choose from uniform, gaussian, multi-gaussian, or linear
-- **Blue noise weight**: Balance between spatial quality and capacity uniformity (capacity-constrained only)
-
-## Output Files
-
-Results are automatically organized into directories:
-
-- **`output/`**: Algorithm results (TXT coordinates + PNG Voronoi diagrams)
-- **`sample_output/`**: Sample images, demos, and test results
-
-**File Types:**
-- **TXT files**: Point coordinates (tab-separated, ready for import)
-- **PNG files**: High-quality visualizations (300 DPI)
-- **Stippling files**: Side-by-side original and stippling comparison
-
-**File Naming:**
-- `algorithm_density_points.txt` - Point coordinates
-- `algorithm_density_points_voronoi.png` - Voronoi diagram  
-- `stippling_algorithm_image_points_stippling.png` - Stippling visualization
-
-## Project Structure
-
 ```
 PointDistributions/
-├── 🐍 Main Scripts
-│   ├── run_algorithms.py          # Main interface for all algorithms
-│   ├── image_stippling.py          # Image stippling interface  
-│   ├── create_sample_images.py     # Generate test images
-│   └── organize_project.py         # Keep project tidy
-│
-├── 📁 Core Implementation
-│   ├── algorithms/                 # Algorithm implementations
-│   ├── utils/                      # Utility modules & image processing
-│   └── tests/                      # Test files
-│
-├── 📁 Generated Content
-│   ├── output/                     # Algorithm results (TXT + PNG)
-│   └── sample_output/              # Test images and demos
-│
-└── 📋 Documentation & Config
-    ├── README.md                   # This file
-    └── requirements.txt            # Python dependencies
+├── run.py                          # Main runner script (YAML config)
+├── demo_stippling.py               # Quick demonstration script
+├── input/                          # Input images
+│   ├── Plant.png                   # Reference plant image
+│   ├── Buildings.png               # Reference buildings image
+│   ├── F_in.png                    # Sample input image
+│   └── S_in.png                    # Additional sample image
+├── output/                         # Generated results
+│   ├── *_ccvt_clean_stippling.png     # CCVT: Pure black dots on white
+│   ├── *_ccvt_points_visualization.png # CCVT: Yellow dots over image
+│   ├── *_ccvt_centers_visualization.png # CCVT: Voronoi centers (red/cyan)
+│   ├── *_lloyd_clean_stippling.png    # Lloyd: Pure black dots on white
+│   ├── *_lloyd_points_visualization.png # Lloyd: Yellow dots over image  
+│   ├── *_lloyd_centers_visualization.png # Lloyd: Voronoi centers (blue/green)
+│   ├── *_ccvt_points.txt              # CCVT point coordinates
+│   ├── *_lloyd_points.txt             # Lloyd point coordinates
+│   ├── *_ccvt_centroids.txt           # CCVT centroid coordinates
+│   ├── *_lloyd_centroids.txt          # Lloyd centroid coordinates
+│   ├── *_density.npy                  # CCVT cached density maps
+│   ├── *_lloyd_density.npy            # Lloyd cached density maps
+│   └── *_metadata.txt                 # Generation metadata
+├── configs/                        # YAML configuration files
+│   ├── ccvt_plant_config.yaml      # CCVT: Plant preset (20,000 points)
+│   ├── ccvt_buildings_config.yaml  # CCVT: Buildings preset (3,000 points)
+│   ├── ccvt_f_in_config.yaml       # CCVT: F_in preset (15,000 points)
+│   ├── lloyd_plant_config.yaml     # Lloyd: Plant preset (20,000 points)
+│   ├── lloyd_buildings_config.yaml # Lloyd: Buildings preset (3,000 points)
+│   ├── lloyd_f_in_config.yaml      # Lloyd: F_in preset (15,000 points)
+│   └── sample_config.yaml          # Template configuration
+├── algorithms/
+│   ├── capacity_constrained/
+│   │   ├── paper_accurate_stippling.py # CCVT algorithm implementation
+│   │   └── lloyd_stippling.py          # Lloyd algorithm implementation
+│   └── standard_lloyd/
+│       └── standard_lloyd.py           # Core Lloyd algorithm
+└── Expected/                       # Reference results from paper
+    ├── BuildingRes.png
+    └── PlantRes.png
 ```
 
-**Directory Organization:**
-- **Clean project root**: Only main scripts visible
-- **Automatic organization**: Run `python organize_project.py` to tidy up
-- **Separated concerns**: Code vs. data vs. results
-- **Git-friendly**: Proper separation of generated files
+## ⚙️ Configuration Format
 
-## Algorithms
+YAML configuration files control all algorithm parameters:
 
-### Standard Lloyd Algorithm
-- Classic Centroidal Voronoi Tessellation
-- Minimizes energy through centroidal movement
-- Ideal for energy-focused applications
+```yaml
+image: "input/Plant.png"           # Input image path
+algorithm: "ccvt"                  # Algorithm: "ccvt" or "lloyd"
+points: 20000                      # Number of stippling points
+output_dir: "output"               # Output directory
+description: "Plant stippling"     # Optional description
+```
 
-### Capacity-Constrained Distribution Algorithm  
-- Blue noise point distribution
-- Balances spatial regularity with capacity constraints
-- Configurable blue noise weight parameter
-- Superior distribution quality for rendering applications
+## 🎨 Algorithm Features
 
-### Exact Paper Algorithm (Optimized)
-- Direct implementation of heap-based algorithm from research paper
-- Fast performance with 5-10x speed improvement
-- Best balance of quality and speed
-- Recommended for most applications
+### CCVT (Capacity-Constrained Voronoi Tessellation)
+- **Paper-Accurate**: Based on Balzer2009 research
+- **Rejection Sampling**: Density-based point placement with high quality
+- **Aggressive Processing**: Precise density extraction and contrast enhancement
+- **Unique Distribution**: Creates distinctive point patterns
 
-### Original Paper Algorithm (Slow)
-- Exact research implementation for comparison
-- Very slow but matches paper exactly
-- Use only for research validation
+### Lloyd Algorithm  
+- **Centroidal Voronoi**: Classic Lloyd relaxation for smooth distributions
+- **Energy Minimization**: Iterative optimization for even spacing
+- **Fast Convergence**: Efficient algorithm with predictable results
+- **Comparative Baseline**: Standard algorithm for comparison
 
-## Tips & Best Practices
+### Unified Output Quality
+- **Consistent Formats**: Both algorithms produce identical file types
+- **Color-Coded Visualizations**: Algorithm-specific colors for easy distinction
+- **High Resolution**: 300 DPI output for publication quality
+- **Coordinate Export**: Normalized coordinates for further processing
 
-**For Image Stippling:**
-- Use high contrast images for best results
-- Start with 5,000 points for testing, increase for detail
-- Try different algorithms for different artistic effects
-- Adjust blur sigma to control detail level
+## 📊 Performance
 
-**For General Point Distribution:**
-- Use Standard Lloyd for energy minimization
-- Use Capacity-Constrained for blue noise effects
-- Use Optimized Paper for best overall quality
+| Algorithm | Image | Points | Generation Time | Characteristics |
+|-----------|-------|--------|----------------|----------------|
+| **CCVT** | Plant.png | 20,000 | ~6 seconds | High-quality distribution, 64% acceptance |
+| **CCVT** | Buildings.png | 3,000 | ~2 seconds | Dense detail areas, 78% acceptance |
+| **CCVT** | F_in.png | 15,000 | ~6 seconds | Complex patterns, 64% acceptance |
+| **Lloyd** | Plant.png | 20,000 | ~18 seconds | Smooth convergence, 3 iterations |
+| **Lloyd** | Buildings.png | 3,000 | ~8 seconds | Fast convergence, even distribution |
+| **Lloyd** | F_in.png | 15,000 | ~18 seconds | Consistent results, energy optimization |
 
-**Project Maintenance:**
-- Run `python organize_project.py` to keep directories clean
-- Sample images are stored in `sample_output/`
-- Results automatically go to `output/`
+## � Command Reference
 
-## Dependencies
+```bash
+# List available presets
+python run.py --list-presets
 
-- **numpy** - Numerical computations
-- **matplotlib** - Plotting and visualization  
-- **scipy** - Scientific computing (Voronoi, spatial operations)
-- **pillow** - Image processing for stippling
-- **scikit-learn** - Blue noise analysis
+# Create sample configuration  
+python run.py --create-sample
 
-## License
+# Run with configuration
+python run.py config.yaml
+
+# Quick demonstration
+python demo_stippling.py
+```
+
+## 📝 Output Files
+
+Each algorithm run generates a complete set of outputs with algorithm-specific naming:
+
+### CCVT Algorithm Outputs:
+1. **`*_ccvt_clean_stippling.png`** - Pure black dots on white background
+2. **`*_ccvt_points_visualization.png`** - Yellow dots over original image  
+3. **`*_ccvt_centers_visualization.png`** - Voronoi centers (red dots, cyan cells)
+4. **`*_ccvt_points.txt`** - Point coordinates (x, y) in [0,1] range
+5. **`*_ccvt_centroids.txt`** - Centroid coordinates (same as points)
+6. **`*_ccvt_metadata.txt`** - Generation metadata and parameters
+7. **`*_density.npy`** - CCVT cached density map for reuse
+
+### Lloyd Algorithm Outputs:
+1. **`*_lloyd_clean_stippling.png`** - Pure black dots on white background
+2. **`*_lloyd_points_visualization.png`** - Yellow dots over original image
+3. **`*_lloyd_centers_visualization.png`** - Voronoi centers (blue dots, green cells)
+4. **`*_lloyd_points.txt`** - Point coordinates (x, y) in [0,1] range
+5. **`*_lloyd_centroids.txt`** - Centroid coordinates (same as points)
+6. **`*_lloyd_metadata.txt`** - Generation metadata and parameters
+7. **`*_lloyd_density.npy`** - Lloyd cached density map for reuse
+
+## 🎯 Algorithm Comparison
+
+### CCVT Algorithm
+Based on **Balzer2009: Capacity-constrained Point Distributions**, this implementation reproduces paper-accurate results:
+- **Figure 7c**: Plant stippling with 20,000 points
+- **Figure 8**: Buildings detail with 3,000 points
+
+**Key Parameters:**
+- Gaussian blur (σ=1.0)
+- Aggressive threshold (0.35) 
+- Power contrast enhancement (γ=0.2)
+- Rejection sampling for point placement
+
+### Lloyd Algorithm
+Standard Centroidal Voronoi Tessellation for comparison:
+- Energy-based optimization
+- Smooth, even distribution
+- Fast convergence (typically 3-5 iterations)
+- Predictable, consistent results
+
+## 🚀 Installation
+
+```bash
+# Clone repository  
+git clone https://github.com/OfirGiladBGU/PointDistributions.git
+cd PointDistributions
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Test with sample configurations
+python run.py configs/ccvt_f_in_config.yaml
+python run.py configs/lloyd_f_in_config.yaml
+```
+
+## 📚 Dependencies
+
+- `numpy` - Numerical computations
+- `matplotlib` - Visualization and plotting
+- `pillow` - Image processing  
+- `scipy` - Gaussian filtering
+- `pyyaml` - Configuration file parsing
+
+## 🎨 Usage Examples
+
+## 🎨 Usage Examples
+
+### Basic Algorithm Comparison
+```bash
+# Compare both algorithms on the same image
+python run.py configs/ccvt_plant_config.yaml
+python run.py configs/lloyd_plant_config.yaml
+```
+
+### Custom Images
+```yaml
+# my_config.yaml
+image: "input/my_image.png"
+algorithm: "ccvt"                   # or "lloyd"
+points: 5000
+output_dir: "output"
+description: "Custom stippling"
+```
+
+```bash
+python run.py my_config.yaml
+```
+
+### Batch Processing
+```bash
+# Process with both algorithms
+python run.py configs/ccvt_f_in_config.yaml
+python run.py configs/lloyd_f_in_config.yaml
+
+# Compare results in output/ directory:
+# F_in_ccvt_points_visualization.png vs F_in_lloyd_points_visualization.png
+```
+
+This system provides a clean, efficient workflow for generating high-quality stippling results with dual algorithm support and comprehensive output options for easy comparison.
+
+## 📚 Dependencies
+
+- **numpy** - Numerical computations and array operations
+- **matplotlib** - Visualization and plotting for all output images
+- **pillow** - Image processing and loading
+- **scipy** - Scientific computing (Gaussian filtering, Voronoi diagrams)
+- **pyyaml** - YAML configuration file parsing
+
+## 🏆 Key Features
+
+- **Dual Algorithm Support**: Compare CCVT and Lloyd algorithms side-by-side
+- **Unified Output Format**: Consistent file naming and visualization styles
+- **Color-Coded Results**: Visual distinction between algorithm outputs
+- **High-Quality Visualizations**: 300 DPI publication-ready images
+- **Clean Configuration**: Simple YAML-based parameter control
+- **Comprehensive Output**: Points, visualizations, and metadata for each run
+
+## 📄 License
 
 MIT License

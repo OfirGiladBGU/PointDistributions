@@ -1,0 +1,6 @@
+# Configuration for Buildings.png stippling (Figure 8 from paper)
+image: "input/Buildings.png"
+algorithm: "ccvt"
+points: 3000
+output_dir: "output"
+description: "CCVT stippling for Buildings.png matching Figure 8 detail (3,000 points)"

@@ -1,4 +1,5 @@
 # Generated output files
+input/
 output/
 *.png
 *.jpg

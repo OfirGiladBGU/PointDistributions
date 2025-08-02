@@ -7,92 +7,65 @@ Based on the successful test_new_approach.py script
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw
-from scipy import ndimage
+from scipy.ndimage import gaussian_filter
 import os
 import time
 import argparse
 
 def load_or_create_density(image_path):
-    """Create proper density based on image content"""
+    """Create paper-accurate density based on image content"""
     import os
     from pathlib import Path
+    from PIL import Image
+    from scipy.ndimage import gaussian_filter
     
     # Create unique density file name based on input image
     image_name = Path(image_path).stem
     density_file = f'{image_name}_density.npy'
     
     if not os.path.exists(density_file):
-        print(f"Creating density for {image_name}...")
-        density = create_image_based_density(image_path)
-        np.save(density_file, density)
-        print(f"Saved density to {density_file}")
+        print(f"Creating paper-accurate density for {image_name}...")
+        
+        # Load and process image using paper-accurate approach
+        img = Image.open(image_path).convert('L')
+        img_array = np.array(img, dtype=np.float64)
+        
+        # Apply blur and normalization (following paper_accurate_ccvt.py)
+        img_array = gaussian_filter(img_array, sigma=1.0)
+        img_array = img_array / 255.0
+        img_array = 1.0 - img_array  # Invert for stippling
+        
+        # Use paper-accurate aggressive thresholding
+        threshold = 0.35  # Aggressive - only accept very dense areas
+        img_array = np.maximum(img_array - threshold, 0.0)
+        
+        # Renormalize after thresholding
+        if img_array.max() > 0:
+            img_array = img_array / img_array.max()
+        
+        # Apply contrast enhancement (paper-accurate)
+        img_array = np.power(img_array, 0.2)  # Very aggressive contrast
+        
+        # CRITICAL: Don't add minimum density - let background be zero!
+        print(f"After paper-accurate processing: nonzero={np.count_nonzero(img_array)}/{img_array.size} ({100*np.count_nonzero(img_array)/img_array.size:.1f}%)")
+        
+        np.save(density_file, img_array)
+        print(f"Saved paper-accurate density to {density_file}")
     else:
         print(f"Loading existing density from {density_file}...")
-        density = np.load(density_file)
+        img_array = np.load(density_file)
     
-    print(f"Loaded density: {density.shape}, range: {density.min():.3f} to {density.max():.3f}")
-    return density
-
-def create_image_based_density(image_path):
-    """Create density function based on actual image content"""
-    from PIL import Image
-    from scipy import ndimage
-    
-    # Load and convert image
-    img = Image.open(image_path)
-    if img.mode != 'RGB':
-        img = img.convert('RGB')
-    
-    img_array = np.array(img)
-    height, width = img_array.shape[:2]
-    
-    # Convert to grayscale
-    gray = np.mean(img_array, axis=2) / 255.0
-    
-    print(f"Processing image: {width}x{height}")
-    print(f"Gray range: {gray.min():.3f} to {gray.max():.3f}")
-    
-    # Method 1: Edge detection for structural details
-    grad_x = ndimage.sobel(gray, axis=1)
-    grad_y = ndimage.sobel(gray, axis=0)
-    edge_magnitude = np.sqrt(grad_x**2 + grad_y**2)
-    
-    # Method 2: Local texture variation
-    kernel_size = 5
-    local_std = ndimage.generic_filter(gray, np.std, size=kernel_size)
-    
-    # Method 3: Gradient density for details
-    local_mean = ndimage.uniform_filter(gray, size=kernel_size)
-    detail_variation = np.abs(gray - local_mean)
-    
-    # Combine features with emphasis on structural elements
-    density = (
-        0.4 * edge_magnitude +           # Strong edges (building outlines, windows)
-        0.3 * local_std +                # Texture variation
-        0.3 * detail_variation           # Fine details
-    )
-    
-    # Normalize to [0, 1] range
-    if density.max() > density.min():
-        density = (density - density.min()) / (density.max() - density.min())
-    
-    # Add minimum density to ensure some coverage everywhere
-    min_density = 0.01
-    max_density = 0.95
-    density = min_density + density * (max_density - min_density)
-    
-    print(f"Created density - range: {density.min():.3f} to {density.max():.3f}, mean: {density.mean():.3f}")
-    
-    return density
+    print(f"Loaded density: {img_array.shape}, range: {img_array.min():.3f} to {img_array.max():.3f}")
+    return img_array
 
 def generate_discrete_points_from_density(density, num_points=10000):
     """Generate discrete points using the density function"""
     height, width = density.shape
     points = []
     attempts = 0
-    max_attempts = num_points * 20
+    max_attempts = num_points * 100  # More attempts since we're more selective
     
-    print(f"Generating {num_points} points using density function...")
+    print(f"Generating {num_points} points using paper-accurate density...")
     
     while len(points) < num_points and attempts < max_attempts:
         x = np.random.rand()
@@ -103,18 +76,19 @@ def generate_discrete_points_from_density(density, num_points=10000):
         
         density_val = density[img_y, img_x]
         
-        if np.random.rand() < density_val:
+        # Paper-accurate approach: Only accept if density > 0 (eliminates background)
+        if density_val > 0 and np.random.rand() < density_val:
             points.append([x, y])
         
         attempts += 1
         
-        if attempts % 5000 == 0:
-            print(f"  Attempts: {attempts}, Generated: {len(points)}, Rate: {len(points)/attempts:.4f}")
+        if len(points) % 1000 == 0 and len(points) > 0:
+            print(f"   Generated {len(points)}/{num_points} points (attempts: {attempts})")
     
     points = np.array(points)
     acceptance_rate = len(points) / attempts if attempts > 0 else 0
     
-    print(f"Point generation complete: {len(points)} points, rate: {acceptance_rate:.4f}")
+    print(f"✅ Generated {len(points)} points using paper-accurate approach, rate: {acceptance_rate:.4f}")
     return points
 
 def run_ccvt_optimization(points, num_sites=800, max_iterations=20):

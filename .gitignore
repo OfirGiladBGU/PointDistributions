@@ -4,6 +4,10 @@ output/
 *.jpg
 *.pdf
 
+# Test scripts and debugging files
+test/
+*.npy
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

@@ -1,31 +1,53 @@
 # Point Distribution Algorithms
 
-A comprehensive implementation of point distribution algorithms with Voronoi tessellation export and **image stippling capabilities**.
+(Based on: [ccvt](https://github.com/Atrix256/ccvt))
 
-## Features
+A comprehensive implementation of Capacity-Constrained Voronoi Tessellation (CCVT) for image stippling and point distribution.
 
-- **Standard Lloyd Algorithm**: Classic Centroidal Voronoi Tessellation (CVT)
-- **Capacity-Constrained Distribution Algorithm**: Blue noise point distribution with capacity constraints
-- **Exact Paper Algorithm**: Direct implementation of the heap-based algorithm from research paper
-- **🎨 Image Stippling**: Convert images to artistic point distributions (NEW!)
-- **Export Capabilities**: 
-  - Point positions as TXT files
-  - Voronoi diagrams as high-quality PNG files
-  - Stippling visualizations for artistic effects
+## 🎯 Main Features
 
-## Quick Start
+- **Ultra-Targeted CCVT**: Advanced image stippling algorithm that properly concentrates points on subjects
+- **Adaptive Processing**: Automatically detects and handles different image types (architectural, organic, etc.)
+- **High-Quality Output**: Generates artistic stippling effects similar to hand-drawn illustrations
+- **Export Capabilities**: Point coordinates, visualizations, and analysis tools
 
-1. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+## 🚀 Quick Start
 
-2. **Run the tool:**
-   ```bash
-   python run_algorithms.py
-   ```
+### Simple Usage
 
-3. **🆕 For image stippling:**
+```bash
+# Stipple any image
+python ccvt_stippling.py sample_output/Plant.png
+
+# Customize parameters  
+python ccvt_stippling.py sample_output/Buildings.png -s 800 -p 10000 -i 20
+```
+
+### Python API
+
+```python
+from ccvt_stippling import create_ccvt_stippling
+
+# Generate stippling for an image
+sites, points = create_ccvt_stippling("my_image.png", num_sites=600)
+```
+
+## 📁 Project Structure
+
+### Main Scripts (Production Ready)
+- `ccvt_stippling.py` - **Main entry point** for creating stippling
+- `ultra_targeted_flower.py` - Core algorithm for adaptive density detection  
+- `paper_accurate_ccvt.py` - Research paper implementation
+- `run_algorithms.py` - Batch processing and comparison tools
+- `run_optimized_ccvt.py` - Speed-optimized version
+
+### Development & Testing
+- `test/` - All test scripts, validation tools, and experimental code (git ignored)
+- `sample_output/` - Sample images for testing
+- `output/` - Generated stippling results
+- `utils/` - Utility functions and helpers
+
+## 🎨 Examples
    ```bash
    python image_stippling.py
    ```

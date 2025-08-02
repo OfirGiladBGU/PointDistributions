@@ -69,7 +69,8 @@ def run_algorithm(config):
         return run_paper_accurate_stippling(
             image_path=config['image'],
             num_points=config['points'],
-            output_dir=output_dir
+            output_dir=output_dir,
+            threshold=config.get('threshold', 0.35)
         )
     elif config['algorithm'] == 'lloyd':
         return run_lloyd_stippling(
@@ -89,6 +90,7 @@ def create_sample_config(output_path='sample_config.yaml'):
         'algorithm': 'ccvt',
         'points': 20000,
         'output_dir': 'output',
+        'threshold': 0.35,
         'description': 'CCVT stippling for Plant.png (Figure 7c)'
     }
     
@@ -97,6 +99,37 @@ def create_sample_config(output_path='sample_config.yaml'):
     
     print(f"✅ Sample configuration created: {output_path}")
     return output_path
+
+def resolve_config_path(config_name):
+    """
+    Resolve configuration file path.
+    First checks current directory, then checks configs/ folder.
+    
+    Args:
+        config_name: Configuration file name or path
+        
+    Returns:
+        Resolved path if file exists, None otherwise
+    """
+    # Try the provided path first (could be absolute or relative)
+    config_path = Path(config_name)
+    if config_path.exists():
+        return config_path
+    
+    # If not found and it's just a filename, try configs/ folder
+    if not config_path.is_absolute() and '/' not in config_name and '\\' not in config_name:
+        configs_path = Path('configs') / config_name
+        if configs_path.exists():
+            print(f"📁 Found config in configs/ folder: {configs_path}")
+            return configs_path
+    
+    # Config file not found
+    print(f"ERROR: Configuration file '{config_name}' not found")
+    if not config_path.is_absolute() and '/' not in config_name and '\\' not in config_name:
+        print(f"  Checked: {config_path} and {Path('configs') / config_name}")
+    else:
+        print(f"  Checked: {config_path}")
+    return None
 
 def main():
     """Command line interface"""
@@ -132,13 +165,18 @@ def main():
     if not args.config:
         print("ERROR: No configuration file specified")
         print("\\nUsage:")
-        print("  python run.py config.yaml              # Run with config")
+        print("  python run.py config.yaml              # Run with config file")
+        print("  python run.py ccvt_plant_config.yaml   # Config from configs/ folder")
         print("  python run.py --create-sample          # Create sample config")
         print("  python run.py --list-presets           # Show preset options")
         return
     
     # Load and validate configuration
-    config = load_config(args.config)
+    config_path = resolve_config_path(args.config)
+    if config_path is None:
+        return
+        
+    config = load_config(config_path)
     if config is None:
         return
     

@@ -3,4 +3,5 @@ image: "input/Buildings.png"
 algorithm: "lloyd"
 points: 3000
 output_dir: "output"
+threshold: 0.35  # Not used by Lloyd algorithm, but included for consistency
 description: "Lloyd algorithm for Buildings.png (3,000 points)"

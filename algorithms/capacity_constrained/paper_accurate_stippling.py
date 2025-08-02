@@ -15,18 +15,20 @@ from scipy.ndimage import gaussian_filter
 import os
 import time
 
-def load_or_create_density(image_path, output_dir="output"):
+def load_or_create_density(image_path, output_dir="output", threshold=0.35):
     """Create paper-accurate density based on image content"""
     from pathlib import Path
     
-    # Create unique density file name based on input image
+    # Create unique density file name based on input image and threshold
     image_name = Path(image_path).stem
-    density_file = os.path.join(output_dir, f'{image_name}_density.npy')
+    # Include threshold in filename to avoid conflicts between different thresholds
+    threshold_str = str(threshold).replace('.', '_')
+    density_file = os.path.join(output_dir, f'{image_name}_density_t{threshold_str}.npy')
     
     os.makedirs(output_dir, exist_ok=True)
     
     if not os.path.exists(density_file):
-        print(f"Creating paper-accurate density for {image_name}...")
+        print(f"Creating paper-accurate density for {image_name} (threshold={threshold})...")
         
         # Load and process image using paper-accurate approach
         img = Image.open(image_path).convert('L')
@@ -37,8 +39,8 @@ def load_or_create_density(image_path, output_dir="output"):
         img_array = img_array / 255.0
         img_array = 1.0 - img_array  # Invert for stippling
         
-        # Use paper-accurate aggressive thresholding
-        threshold = 0.35  # Aggressive - only accept very dense areas
+        # Use configurable aggressive thresholding  
+        # threshold parameter passed from config (default: 0.35 - aggressive)
         img_array = np.maximum(img_array - threshold, 0.0)
         
         # Renormalize after thresholding
@@ -54,7 +56,7 @@ def load_or_create_density(image_path, output_dir="output"):
         np.save(density_file, img_array)
         print(f"Saved paper-accurate density to {density_file}")
     else:
-        print(f"Loading existing density from {density_file}...")
+        print(f"Loading existing density from {density_file} (threshold={threshold})...")
         img_array = np.load(density_file)
     
     print(f"Loaded density: {img_array.shape}, range: {img_array.min():.3f} to {img_array.max():.3f}")
@@ -116,7 +118,7 @@ def create_clean_stippling(points, image_path, output_path):
     stipple_img.save(output_path)
     print(f"Clean stippling saved: {output_path}")
 
-def run_paper_accurate_stippling(image_path, num_points, output_dir="output"):
+def run_paper_accurate_stippling(image_path, num_points, output_dir="output", threshold=0.35):
     """
     Main function to run paper-accurate stippling algorithm
     
@@ -124,6 +126,7 @@ def run_paper_accurate_stippling(image_path, num_points, output_dir="output"):
         image_path: Path to input image
         num_points: Number of stippling points to generate
         output_dir: Output directory for results
+        threshold: Density threshold for aggressive filtering (default: 0.35)
         
     Returns:
         points: Generated stippling points
@@ -143,7 +146,7 @@ def run_paper_accurate_stippling(image_path, num_points, output_dir="output"):
     
     # Step 1: Generate paper-accurate discrete points
     print(f"\\n🎯 Generating {num_points} discrete points from image density...")
-    density = load_or_create_density(image_path, output_dir)
+    density = load_or_create_density(image_path, output_dir, threshold)
     points = generate_discrete_points_from_density(density, num_points)
     
     if len(points) == 0:

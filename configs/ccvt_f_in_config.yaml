@@ -3,4 +3,5 @@ image: "input/F_in.png"
 algorithm: "ccvt"
 points: 15000
 output_dir: "output"
+threshold: 0.35
 description: "CCVT stippling for F_in.png (15,000 points)"

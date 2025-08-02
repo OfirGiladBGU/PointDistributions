@@ -3,4 +3,5 @@ image: "input/Plant.png"
 algorithm: "ccvt"
 points: 20000
 output_dir: "output"
+threshold: 0.05
 description: "CCVT stippling for Plant.png matching Figure 7c (20,000 points)"

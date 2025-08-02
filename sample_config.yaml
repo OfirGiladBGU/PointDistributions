@@ -3,3 +3,4 @@ description: CCVT stippling for Plant.png (Figure 7c)
 image: input/Plant.png
 output_dir: output
 points: 20000
+threshold: 0.35

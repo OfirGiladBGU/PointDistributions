@@ -2,12 +2,18 @@
 Capacity-Constrained Point Distribution Algorithm package.
 """
 
-from .capacity_constrained_distribution import CapacityConstrainedDistributionAlgorithm
-from .capacity_constrained_voronoi import CapacityConstrainedVoronoiAlgorithm
-from .optimized_capacity_constrained_voronoi import OptimizedCapacityConstrainedVoronoiAlgorithm
+from .paper_accurate_stippling import (
+    CapacityConstrainedVoronoiTessellation, 
+    CCVTSite,
+    run_paper_accurate_ccvt,
+    load_or_create_density,
+    generate_ccvt_points_from_density
+)
 
 __all__ = [
-    'CapacityConstrainedDistributionAlgorithm', 
-    'CapacityConstrainedVoronoiAlgorithm',
-    'OptimizedCapacityConstrainedVoronoiAlgorithm'
+    'CapacityConstrainedVoronoiTessellation',
+    'CCVTSite', 
+    'run_paper_accurate_ccvt',
+    'load_or_create_density',
+    'generate_ccvt_points_from_density'
 ]

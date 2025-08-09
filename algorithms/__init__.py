@@ -3,6 +3,6 @@ Algorithms package for Lloyd-type algorithms.
 """
 
 from .standard_lloyd import StandardLloydAlgorithm
-from .capacity_constrained import CapacityConstrainedDistributionAlgorithm
+from .capacity_constrained import CapacityConstrainedVoronoiTessellation
 
-__all__ = ['StandardLloydAlgorithm', 'CapacityConstrainedDistributionAlgorithm']
+__all__ = ['StandardLloydAlgorithm', 'CapacityConstrainedVoronoiTessellation']

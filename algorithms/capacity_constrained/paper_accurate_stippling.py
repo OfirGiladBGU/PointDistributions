@@ -309,51 +309,66 @@ class CapacityConstrainedVoronoiTessellation:
         return np.array([site.location for site in self.sites])
 
 
-def load_or_create_density(image_path, output_dir="output", threshold=0.35):
-    """Create paper-accurate density based on image content"""
+def load_or_create_density(image_path, output_dir="output", threshold=0.1, reverse_colors=True):
+    """Create paper-accurate density based on image content
+    
+    Args:
+        image_path: Path to input image
+        output_dir: Directory to save density files
+        threshold: Density threshold for filtering
+        reverse_colors: If True, dark areas = high density (stippling mode)
+                       If False, bright areas = high density (inverse stippling)
+    """
     from pathlib import Path
     
-    # Create unique density file name based on input image and threshold
+    # Create unique density file name based on input image, threshold, and color mode
     image_name = Path(image_path).stem
-    # Include threshold in filename to avoid conflicts between different thresholds
     threshold_str = str(threshold).replace('.', '_')
-    density_file = os.path.join(output_dir, f'{image_name}_density_t{threshold_str}.npy')
+    color_mode = "dark" if reverse_colors else "bright"
+    density_file = os.path.join(output_dir, f'{image_name}_density_t{threshold_str}_{color_mode}.npy')
     
     os.makedirs(output_dir, exist_ok=True)
     
     if not os.path.exists(density_file):
-        print(f"Creating paper-accurate density for {image_name} (threshold={threshold})...")
+        print(f"Creating paper-accurate density for {image_name} (threshold={threshold}, {color_mode}_dense)...")
         
-        # Load and process image using paper-accurate approach
+        # Load and process image
         img = Image.open(image_path).convert('L')
         img_array = np.array(img, dtype=np.float64)
         
-        # Apply blur and normalization (following paper_accurate_ccvt.py)
-        img_array = gaussian_filter(img_array, sigma=1.0)
+        # Normalize to [0, 1]
         img_array = img_array / 255.0
-        img_array = 1.0 - img_array  # Invert for stippling
         
-        # Use configurable aggressive thresholding  
-        # threshold parameter passed from config (default: 0.35 - aggressive)
+        # Apply color inversion based on mode
+        if reverse_colors:
+            img_array = 1.0 - img_array  # Dark areas become high density
+            print("Mode: Dark areas will have HIGH density (traditional stippling)")
+        else:
+            # Keep as-is: bright areas have high density
+            print("Mode: Bright areas will have HIGH density (inverse stippling)")
+        
+        # REMOVED: Gaussian blur that was destroying detail
+        # img_array = gaussian_filter(img_array, sigma=1.0)  # THIS WAS THE PROBLEM!
+        
+        # Apply aggressive thresholding to remove low-density areas
         img_array = np.maximum(img_array - threshold, 0.0)
         
-        # Renormalize after thresholding
-        if img_array.max() > 0:
-            img_array = img_array / img_array.max()
+        # REMOVED RENORMALIZATION: Keep original density differences!
+        # The renormalization was flattening the density differences between regions
         
-        # Apply contrast enhancement (paper-accurate)
-        img_array = np.power(img_array, 0.2)  # Very aggressive contrast
+        # Apply contrast enhancement for better density differences
+        img_array = np.power(img_array, 0.5)  # Less aggressive than 0.2, preserves more detail
         
-        # CRITICAL: Don't add minimum density - let background be zero!
-        print(f"After paper-accurate processing: nonzero={np.count_nonzero(img_array)}/{img_array.size} ({100*np.count_nonzero(img_array)/img_array.size:.1f}%)")
+        print(f"After processing: nonzero={np.count_nonzero(img_array)}/{img_array.size} ({100*np.count_nonzero(img_array)/img_array.size:.1f}%)")
+        print(f"Density range: {img_array.min():.3f} to {img_array.max():.3f}")
         
         np.save(density_file, img_array)
-        print(f"Saved paper-accurate density to {density_file}")
+        print(f"Saved density to {density_file}")
     else:
-        print(f"Loading existing density from {density_file} (threshold={threshold})...")
+        print(f"Loading existing density from {density_file} ({color_mode}_dense)...")
         img_array = np.load(density_file)
     
-    print(f"Loaded density: {img_array.shape}, range: {img_array.min():.3f} to {img_array.max():.3f}")
+    print(f"Final density: {img_array.shape}, range: {img_array.min():.3f} to {img_array.max():.3f}")
     return img_array
 
 
@@ -374,12 +389,17 @@ def generate_ccvt_points_from_density(density: np.ndarray, num_sites: int,
     height, width = density.shape
     num_discrete_points = num_sites * points_per_site_ratio
     
-    print(f"Generating {num_discrete_points} discrete points for {num_sites} sites...")
+    print(f"\n🎯 Generating {num_discrete_points} discrete points for {num_sites} sites...")
+    print(f"Density-based rejection sampling in progress...")
     
-    # Step 1: Generate discrete points using rejection sampling
+    # Step 1: Generate discrete points using density-based rejection sampling
     discrete_points = []
     attempts = 0
-    max_attempts = num_discrete_points * 100
+    max_attempts = num_discrete_points * 200  # Increase attempts for better sampling
+    
+    # Track sampling statistics
+    total_attempts = 0
+    density_accepts = 0
     
     while len(discrete_points) < num_discrete_points and attempts < max_attempts:
         x = np.random.rand()
@@ -389,20 +409,35 @@ def generate_ccvt_points_from_density(density: np.ndarray, num_sites: int,
         img_y = int(y * (height - 1))
         
         density_val = density[img_y, img_x]
+        total_attempts += 1
         
-        # Paper-accurate approach: Only accept if density > 0
+        # Accept point based on density (higher density = more likely to accept)
         if density_val > 0 and np.random.rand() < density_val:
             discrete_points.append([x, y])
+            density_accepts += 1
         
         attempts += 1
         
-        if len(discrete_points) % 1000 == 0 and len(discrete_points) > 0:
-            print(f"   Generated {len(discrete_points)}/{num_discrete_points} discrete points")
+        # Progress reporting
+        if len(discrete_points) % 500 == 0 and len(discrete_points) > 0:
+            accept_rate = density_accepts / total_attempts if total_attempts > 0 else 0
+            print(f"   Generated {len(discrete_points)}/{num_discrete_points} points "
+                  f"(accept rate: {accept_rate:.3f})")
     
     discrete_points = np.array(discrete_points)
-    print(f"✅ Generated {len(discrete_points)} discrete points")
+    
+    if len(discrete_points) < num_discrete_points:
+        print(f"⚠️  Only generated {len(discrete_points)}/{num_discrete_points} discrete points")
+        print(f"   Consider lowering threshold or increasing max_attempts")
+    else:
+        print(f"✅ Generated {len(discrete_points)} discrete points")
+    
+    if len(discrete_points) == 0:
+        print("❌ ERROR: No points generated! Density might be too sparse.")
+        return np.array([]), np.array([])
     
     # Step 2: Run CCVT optimization
+    print(f"\n🔄 Initializing CCVT with {num_sites} sites...")
     ccvt = CapacityConstrainedVoronoiTessellation()
     ccvt.initialize_sites(discrete_points, num_sites)
     
@@ -412,51 +447,7 @@ def generate_ccvt_points_from_density(density: np.ndarray, num_sites: int,
     print(f"✅ CCVT optimization complete: {len(final_sites)} sites")
     
     return final_sites, discrete_points
-    """Create paper-accurate density based on image content"""
-    from pathlib import Path
-    
-    # Create unique density file name based on input image and threshold
-    image_name = Path(image_path).stem
-    # Include threshold in filename to avoid conflicts between different thresholds
-    threshold_str = str(threshold).replace('.', '_')
-    density_file = os.path.join(output_dir, f'{image_name}_density_t{threshold_str}.npy')
-    
-    os.makedirs(output_dir, exist_ok=True)
-    
-    if not os.path.exists(density_file):
-        print(f"Creating paper-accurate density for {image_name} (threshold={threshold})...")
-        
-        # Load and process image using paper-accurate approach
-        img = Image.open(image_path).convert('L')
-        img_array = np.array(img, dtype=np.float64)
-        
-        # Apply blur and normalization (following paper_accurate_ccvt.py)
-        img_array = gaussian_filter(img_array, sigma=1.0)
-        img_array = img_array / 255.0
-        img_array = 1.0 - img_array  # Invert for stippling
-        
-        # Use configurable aggressive thresholding  
-        # threshold parameter passed from config (default: 0.35 - aggressive)
-        img_array = np.maximum(img_array - threshold, 0.0)
-        
-        # Renormalize after thresholding
-        if img_array.max() > 0:
-            img_array = img_array / img_array.max()
-        
-        # Apply contrast enhancement (paper-accurate)
-        img_array = np.power(img_array, 0.2)  # Very aggressive contrast
-        
-        # CRITICAL: Don't add minimum density - let background be zero!
-        print(f"After paper-accurate processing: nonzero={np.count_nonzero(img_array)}/{img_array.size} ({100*np.count_nonzero(img_array)/img_array.size:.1f}%)")
-        
-        np.save(density_file, img_array)
-        print(f"Saved paper-accurate density to {density_file}")
-    else:
-        print(f"Loading existing density from {density_file} (threshold={threshold})...")
-        img_array = np.load(density_file)
-    
-    print(f"Loaded density: {img_array.shape}, range: {img_array.min():.3f} to {img_array.max():.3f}")
-    return img_array
+
 
 def create_clean_stippling(points, image_path, output_path):
     """Create a clean stippling without background image overlay"""
@@ -482,7 +473,7 @@ def create_clean_stippling(points, image_path, output_path):
     print(f"Clean stippling saved: {output_path}")
 
 
-def run_paper_accurate_ccvt(image_path, num_points, output_dir="output", threshold=0.35):
+def run_paper_accurate_ccvt(image_path, num_points, output_dir="output", threshold=0.1, reverse_colors=True):
     """
     Main function to run paper-accurate CCVT algorithm
     
@@ -490,7 +481,8 @@ def run_paper_accurate_ccvt(image_path, num_points, output_dir="output", thresho
         image_path: Path to input image
         num_points: Number of final stippling points (sites)
         output_dir: Output directory for results
-        threshold: Density threshold for aggressive filtering (default: 0.35)
+        threshold: Density threshold for aggressive filtering (default: 0.1)
+        reverse_colors: If True, dark=dense (stippling), if False, bright=dense (inverse)
         
     Returns:
         points: Generated CCVT-optimized points
@@ -501,6 +493,8 @@ def run_paper_accurate_ccvt(image_path, num_points, output_dir="output", thresho
     print(f"{'='*60}")
     print(f"Image: {image_path}")
     print(f"Final Points (Sites): {num_points}")
+    print(f"Density Mode: {'Dark=Dense (Stippling)' if reverse_colors else 'Bright=Dense (Inverse)'}")
+    print(f"Threshold: {threshold}")
     print(f"Output: {output_dir}")
     
     start_time = time.time()
@@ -509,8 +503,8 @@ def run_paper_accurate_ccvt(image_path, num_points, output_dir="output", thresho
     os.makedirs(output_dir, exist_ok=True)
     
     # Step 1: Generate paper-accurate density
-    print(f"\\n🎯 Loading/creating paper-accurate density...")
-    density = load_or_create_density(image_path, output_dir, threshold)
+    print(f"\\n🎯 Loading/creating density-based distribution...")
+    density = load_or_create_density(image_path, output_dir, threshold, reverse_colors)
     
     # Step 2: Generate CCVT-optimized points
     print(f"\\n🔄 Running CCVT optimization...")
@@ -527,33 +521,42 @@ def run_paper_accurate_ccvt(image_path, num_points, output_dir="output", thresho
     # Step 3: Create output files
     image_name = os.path.splitext(os.path.basename(image_path))[0]
     algo_name = "ccvt"
+    color_suffix = "dark" if reverse_colors else "bright"
     
     print("\\n📁 Creating output files...")
     
     # 1. Clean stippling (black dots on white background)
-    clean_path = os.path.join(output_dir, f"{image_name}_{algo_name}_clean_stippling.png")
+    clean_path = os.path.join(output_dir, f"{image_name}_{algo_name}_{color_suffix}_clean_stippling.png")
     create_clean_stippling(sites, image_path, clean_path)
     
-    # 2. Points visualization (red points over original image)
-    points_viz_path = os.path.join(output_dir, f"{image_name}_{algo_name}_points_visualization.png")
+    # 2. Points visualization (transparent background for reference)
+    points_viz_path = os.path.join(output_dir, f"{image_name}_{algo_name}_{color_suffix}_points_visualization.png")
     create_points_visualization(sites, image_path, points_viz_path)
     
-    # 3. Voronoi centers visualization
-    centers_path = os.path.join(output_dir, f"{image_name}_{algo_name}_centers_visualization.png")
+    # 3. Points on FULL OPACITY original (shows true density distribution)
+    full_opacity_path = os.path.join(output_dir, f"{image_name}_{algo_name}_{color_suffix}_points_on_original.png")
+    create_points_on_original_visualization(sites, image_path, full_opacity_path)
+    
+    # 4. Discrete points visualization (raw density-based points before optimization)
+    discrete_viz_path = os.path.join(output_dir, f"{image_name}_{algo_name}_{color_suffix}_discrete_points_on_original.png")
+    create_discrete_points_visualization(discrete_points, image_path, discrete_viz_path)
+    
+    # 5. Voronoi centers visualization
+    centers_path = os.path.join(output_dir, f"{image_name}_{algo_name}_{color_suffix}_centers_visualization.png")
     create_centers_visualization(sites, image_path, centers_path)
     
-    # 4. Save point coordinates
-    points_path = os.path.join(output_dir, f"{image_name}_{algo_name}_points.txt")
-    centroids_path = os.path.join(output_dir, f"{image_name}_{algo_name}_centroids.txt")
+    # 6. Save point coordinates
+    points_path = os.path.join(output_dir, f"{image_name}_{algo_name}_{color_suffix}_points.txt")
+    centroids_path = os.path.join(output_dir, f"{image_name}_{algo_name}_{color_suffix}_centroids.txt")
     np.savetxt(points_path, sites, fmt='%.6f', header='x y (CCVT sites in normalized coordinates)')
     np.savetxt(centroids_path, sites, fmt='%.6f', header='x y (CCVT centroids in normalized coordinates)')
     
-    # 5. Save discrete points used for optimization
-    discrete_path = os.path.join(output_dir, f"{image_name}_{algo_name}_discrete_points.txt") 
+    # 7. Save discrete points used for optimization
+    discrete_path = os.path.join(output_dir, f"{image_name}_{algo_name}_{color_suffix}_discrete_points.txt") 
     np.savetxt(discrete_path, discrete_points, fmt='%.6f', header='x y (discrete points used for CCVT optimization)')
     
-    # 6. Save metadata
-    metadata_path = os.path.join(output_dir, f"{image_name}_{algo_name}_metadata.txt")
+    # 8. Save metadata
+    metadata_path = os.path.join(output_dir, f"{image_name}_{algo_name}_{color_suffix}_metadata.txt")
     with open(metadata_path, 'w') as f:
         f.write(f"Image: {os.path.basename(image_path)}\\n")
         f.write(f"Algorithm: CCVT (Capacity-Constrained Voronoi Tessellation)\\n")
@@ -561,15 +564,19 @@ def run_paper_accurate_ccvt(image_path, num_points, output_dir="output", thresho
         f.write(f"Discrete points: {len(discrete_points)}\\n")
         f.write(f"Points per site ratio: 4\\n")
         f.write(f"Density threshold: {threshold}\\n")
+        f.write(f"Color mode: {'Dark=Dense' if reverse_colors else 'Bright=Dense'}\\n")
         f.write(f"Generation time: {time.time() - start_time:.2f} seconds\\n")
         f.write(f"Coordinate system: normalized [0,1] x [0,1]\\n")
-        f.write(f"Density file: {image_name}_density_t{str(threshold).replace('.', '_')}.npy\\n")
+        color_mode = "dark" if reverse_colors else "bright"
+        f.write(f"Density file: {image_name}_density_t{str(threshold).replace('.', '_')}_{color_mode}.npy\\n")
     
     total_time = time.time() - start_time
     print(f"\\n✅ CCVT Complete! Generated in {total_time:.2f} seconds")
     print(f"📁 Files created:")
     print(f"   • {clean_path} (Clean stippling)")
-    print(f"   • {points_viz_path} (Points visualization)")  
+    print(f"   • {points_viz_path} (Points visualization - with transparency)")
+    print(f"   • {full_opacity_path} (Points on original - FULL OPACITY)")  
+    print(f"   • {discrete_viz_path} (Discrete points on original - shows raw density distribution)")
     print(f"   • {centers_path} (Centers visualization)")
     print(f"   • {points_path} (Final CCVT sites)")
     print(f"   • {centroids_path} (CCVT centroids)")
@@ -608,6 +615,57 @@ def create_points_visualization(points, image_path, output_path):
     plt.close()
     
     print(f"Points visualization saved: {output_path}")
+
+
+def create_points_on_original_visualization(points, image_path, output_path):
+    """Create points visualization with bright dots on FULL OPACITY original image
+    
+    This shows the true density distribution without any transparency effects
+    """
+    
+    print(f"Creating full opacity visualization with {len(points)} points...")
+    
+    # Load original image
+    img = Image.open(image_path)
+    if img.mode != 'RGB':
+        img = img.convert('RGB')
+    img_array = np.array(img)
+    
+    print(f"Image loaded: {img_array.shape}")
+    
+    # Create matplotlib figure  
+    fig, ax = plt.subplots(1, 1, figsize=(12, 12))
+    
+    # Show original image at FULL opacity (no transparency)
+    ax.imshow(img_array, alpha=1.0, cmap='gray' if len(img_array.shape) == 2 else None)
+    
+    # Overlay points as bright red dots (visible on both dark and light areas)
+    if len(points) > 0:
+        x_coords = points[:, 0] * img_array.shape[1]
+        y_coords = points[:, 1] * img_array.shape[0]
+        
+        ax.scatter(x_coords, y_coords, 
+                  s=12, c='red', alpha=1.0, 
+                  edgecolors='white', linewidth=1.0, zorder=10)
+        print(f"Plotted {len(points)} points")
+    
+    # Set limits and remove axes
+    ax.set_xlim(0, img_array.shape[1])
+    ax.set_ylim(img_array.shape[0], 0)  # Flip Y axis to match image
+    ax.axis('off')
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300, bbox_inches='tight', pad_inches=0)
+    plt.close()
+    
+    print(f"Full opacity points visualization saved: {output_path}")
+    
+    # Verify file was created
+    if os.path.exists(output_path):
+        file_size = os.path.getsize(output_path)
+        print(f"✅ File created successfully: {file_size} bytes")
+    else:
+        print("❌ ERROR: File was not created!")
 
 def create_centers_visualization(points, image_path, output_path):
     """Create Voronoi centers visualization"""
@@ -661,22 +719,83 @@ def create_centers_visualization(points, image_path, output_path):
     
     print(f"Centers visualization saved: {output_path}")
 
+def create_discrete_points_visualization(discrete_points, image_path, output_path):
+    """Create visualization showing all discrete points (before CCVT optimization)
+    
+    This shows the raw density-based point distribution before optimization
+    """
+    
+    print(f"Creating discrete points visualization with {len(discrete_points)} points...")
+    
+    # Load original image
+    img = Image.open(image_path)
+    if img.mode != 'RGB':
+        img = img.convert('RGB')
+    img_array = np.array(img)
+    
+    print(f"Image loaded: {img_array.shape}")
+    
+    # Create matplotlib figure  
+    fig, ax = plt.subplots(1, 1, figsize=(12, 12))
+    
+    # Show original image at FULL opacity
+    ax.imshow(img_array, alpha=1.0, cmap='gray' if len(img_array.shape) == 2 else None)
+    
+    # Overlay discrete points as small blue dots
+    if len(discrete_points) > 0:
+        x_coords = discrete_points[:, 0] * img_array.shape[1]
+        y_coords = discrete_points[:, 1] * img_array.shape[0]
+        
+        ax.scatter(x_coords, y_coords, 
+                  s=4, c='blue', alpha=0.7, 
+                  edgecolors='lightblue', linewidth=0.5, zorder=10)
+        print(f"Plotted {len(discrete_points)} discrete points")
+    
+    # Set limits and remove axes
+    ax.set_xlim(0, img_array.shape[1])
+    ax.set_ylim(img_array.shape[0], 0)  # Flip Y axis to match image
+    ax.axis('off')
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300, bbox_inches='tight', pad_inches=0)
+    plt.close()
+    
+    print(f"Discrete points visualization saved: {output_path}")
+    
+    # Verify file was created
+    if os.path.exists(output_path):
+        file_size = os.path.getsize(output_path)
+        print(f"✅ File created successfully: {file_size} bytes")
+    else:
+        print("❌ ERROR: File was not created!")
+
 if __name__ == "__main__":
     # Example usage
     import sys
+
+    # if len(sys.argv) < 3:
+    #     print("Usage: python paper_accurate_stippling.py <image_path> <num_points> [threshold]")
+    #     print("  image_path: Path to input image")
+    #     print("  num_points: Number of stippling points to generate")
+    #     print("  threshold:  Density threshold (optional, default=0.1)")
+    #     sys.exit(1)
     
-    if len(sys.argv) < 3:
-        print("Usage: python paper_accurate_stippling.py <image_path> <num_points>")
-        sys.exit(1)
+    # image_path = sys.argv[1]
+    # num_points = int(sys.argv[2])
+    # threshold = float(sys.argv[3]) if len(sys.argv) > 3 else 0.1
     
-    image_path = sys.argv[1]
-    num_points = int(sys.argv[2])
-    
+    # For testing purposes, still allow GRAY image override
+    folder_dir = os.path.dirname(os.path.abspath(__file__))
+    image_path = fr"{folder_dir}\..\..\input\GRAY.jpg"
+    num_points = 200
+    threshold = 0.01  # Default threshold
+
     if not os.path.exists(image_path):
         print(f"ERROR: Image file '{image_path}' not found")
         sys.exit(1)
     
-    points = run_paper_accurate_ccvt(image_path, num_points)
+    print(f"Running CCVT with threshold={threshold}")
+    points = run_paper_accurate_ccvt(image_path, num_points, threshold=threshold)
     
     if points is not None:
         print("\\n🎉 SUCCESS! CCVT stippling completed.")

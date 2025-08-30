@@ -1,3 +1,5 @@
+import os
+import pathlib
 import numpy as np
 from PIL import Image
 from typing import List, Tuple, Optional
@@ -254,7 +256,7 @@ def centroid_update(S, P, V):
     return S_new
 
 
-def CCVT_Lloyd(S, P, C, max_outer_iters=20, tol=1e-6, verbose=False):
+def FastCCVTLloyd(S, P, C, max_outer_iters=20, tol=1e-6, verbose=False):
     """
     Full CCVT-based Lloyd relaxation:
       repeat:
@@ -393,7 +395,7 @@ def visualize_points_over_image(P, image_path, point_px=1.0, dpi=100,
     ax.imshow(img, cmap='gray', origin='upper')
 
     ax.scatter(Ppx[:, 0], Ppx[:, 1],
-               c='yellow', s=_area_pts2_from_px(point_px, dpi),
+               c='red', s=_area_pts2_from_px(point_px, dpi),
                linewidths=0, alpha=alpha_points)
 
     if save_path:
@@ -411,23 +413,28 @@ def main():
     start_time = datetime.datetime.now()
     print(f"Start time: {start_time}")
 
-    S, P, C = build_S_P_C_from_image(image_path, n_sites=128, points_per_site=256, invert=True, gamma=1.6)
+    # Algorithm start
+    S, P, C = build_S_P_C_from_image(image_path, n_sites=128, points_per_site=128, invert=True, gamma=1.6)
     print(f"Input shapes S.shape: {S.shape}, P.shape: {P.shape}, C.shape: {C.shape}")
-    S, V = CCVT_Lloyd(S, P, C, max_outer_iters=30, tol=1e-2, verbose=True)
+    S, V = FastCCVTLloyd(S, P, C, max_outer_iters=30, tol=1e-2, verbose=True)
+    # Algorithm end
+
     end_time = datetime.datetime.now()
     print(f"End time: {end_time}")
     print(f"Duration: {end_time - start_time}")
 
+    save_path_format = pathlib.Path(image_path).stem
+
     # After you compute V = FastCCVT(S, P, C)
     visualize_ccvt_native_size(S, P, V, image_path, point_px=1.0, site_px=4.0,
-                               dpi=100, overlay_image=False, show=True, save_path="0.png")
+                               dpi=100, overlay_image=False, show=True, save_path=f"{save_path_format}_0.png")
 
     # (1) All points on white
-    visualize_points_white(P, image_path, point_px=1.0, dpi=100, show=True, save_path="1.png")
+    visualize_points_white(P, image_path, point_px=1.0, dpi=100, show=True, save_path=f"{save_path_format}_1.png")
 
     # (2) All points in yellow over grayscale image
-    visualize_points_over_image(P, image_path, point_px=1.0, dpi=100, show=True, save_path="2.png")
+    visualize_points_over_image(P, image_path, point_px=1.0, dpi=100, show=True, save_path=f"{save_path_format}_2.png")
 
 if __name__ == "__main__":
-    image_path = fr"C:\Users\ofirg\PycharmProjects\PointDistributions\input\Scale.jpg"
+    image_path = fr"C:\Users\ofirg\PycharmProjects\PointDistributions\input\Plant.png"
     main()

@@ -154,6 +154,13 @@ def SiteSwap(si, sj, S, P, C, V):
     d2_j = np.einsum('md,md->m', PU - S[sj], PU - S[sj])
     delta = d2_j - d2_i
 
+    # Early exit: if max ΔE over sj < min ΔE over si → already optimal
+    if V[si] and V[sj]:
+        U_is_i = np.isin(U, np.asarray(V[si], dtype=int))
+        if U_is_i.any() and (~U_is_i).any():
+            if delta[~U_is_i].max() < delta[U_is_i].min():
+                return False
+
     # Select exactly C[sj] smallest ΔE to assign to sj (median-threshold selection)
     k = int(C[sj])
 

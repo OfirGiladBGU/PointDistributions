@@ -414,7 +414,7 @@ def main():
     print(f"Start time: {start_time}")
 
     # Algorithm start
-    S, P, C = build_S_P_C_from_image(image_path, n_sites=128, points_per_site=128, invert=True, gamma=1.6)
+    S, P, C = build_S_P_C_from_image(image_path, n_sites=128, points_per_site=256, invert=True, gamma=1.6)
     print(f"Input shapes S.shape: {S.shape}, P.shape: {P.shape}, C.shape: {C.shape}")
     S, V = FastCCVTLloyd(S, P, C, max_outer_iters=30, tol=1e-2, verbose=True)
     # Algorithm end

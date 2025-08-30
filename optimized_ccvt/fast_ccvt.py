@@ -4,9 +4,11 @@ from typing import List, Tuple, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import matplotlib.pyplot as plt
 from PIL import Image
+import datetime
 
 Pair = Tuple[int, int]
 Cluster = List[Pair]
+
 
 ###############
 # PRE-PROCESS #
@@ -48,9 +50,9 @@ def build_S_P_C_from_image(image_path, n_sites, points_per_site=256, invert=True
     return S, P, C
 
 
-###########
-# PROCESS #
-###########
+##################
+# PROCESS-Part 1 #
+##################
 
 # Program 6
 def Initialization(S, P, C):
@@ -188,13 +190,18 @@ def SiteSwap(si, sj, S, P, C, V):
 
 
 # Program 2
-def FastCCVT(S, P, C, max_workers=None, max_iterations=50):
+def FastCCVT(S, P, C, max_workers=None, max_iterations=50, V_init=None):
     # input: sites set S, points set P, and capacity constraints C
     #        where \sigma_(si ∈ S) C(si) = |P|.
     # output: the Voronoi set V
 
-    # Initialization(S,P,C) is Program 6
-    V = Initialization(S, P, C)
+    # If provided, start from previous V instead of re-running Initialization
+    if V_init is None:
+        # Initialization(S,P,C) is Program 6
+        V = Initialization(S, P, C)
+    else:
+        # shallow copy of list-of-lists to avoid in-place aliasing across calls
+        V = [list(lst) for lst in V_init]
 
     stable = False
     last_swapped_pairs = []  # for cached-stage clustering (Program 5)
@@ -230,34 +237,47 @@ def FastCCVT(S, P, C, max_workers=None, max_iterations=50):
     return V
 
 
+##################
+# PROCESS-Part 2 #
+##################
+def centroid_update(S, P, V):
+    """Move each site to the centroid of its assigned points (ρ=1)."""
+    n = S.shape[0]
+    S_new = np.empty_like(S)
+    for i in range(n):
+        idxs = V[i]
+        if idxs:
+            X = P[np.asarray(idxs, dtype=int)]
+            S_new[i] = X.mean(axis=0)
+        else:
+            S_new[i] = S[i]  # should not happen with capacity constraint
+    return S_new
+
+
+def CCVT_Lloyd(S, P, C, max_outer_iters=20, tol=1e-6, verbose=False):
+    """
+    Full CCVT-based Lloyd relaxation:
+      repeat:
+        V = FastCCVT(S,P,C)   # capacity-constrained Voronoi step
+        S = centroid_update(S,P,V)
+      until max site movement < tol
+    """
+    V = None
+    for t in range(max_outer_iters):
+        V = FastCCVT(S, P, C, V_init=V)
+        S_new = centroid_update(S, P, V)
+        max_move = np.linalg.norm(S_new - S, axis=1).max()
+        if verbose:
+            print(f"[outer {t}] max_move={max_move:.6e}")
+        S = S_new
+        if max_move < tol:
+            break
+    return S, V
+
+
 ################
 # POST-PROCESS #
 ################
-def visualize_ccvt(S, P, V, point_size=1, site_size=80, alpha=0.85,
-                   figsize=(6,6), dpi=120, title=None, show=True, origin='image'):
-    m = P.shape[0]
-    labels = np.empty(m, dtype=int)
-    for i, idxs in enumerate(V):
-        if idxs:
-            labels[np.asarray(idxs, dtype=int)] = i
-
-    fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
-    ax.scatter(P[:,0], P[:,1], c=labels, s=point_size, alpha=alpha, linewidths=0)
-    ax.scatter(S[:,0], S[:,1], marker='x', s=site_size, linewidths=1.5, c='k')
-
-    ax.set_aspect('equal', adjustable='box')
-    ax.set_xlim(0, 1); ax.set_ylim(0, 1)
-    ax.set_xticks([]); ax.set_yticks([])
-    if title: ax.set_title(title)
-
-    # Flip Y so (0,0) is top-left like an image
-    if origin == 'image':
-        ax.invert_yaxis()
-
-    if show:
-        plt.show()
-    return fig, ax
-
 
 # --- small helpers ---
 
@@ -327,6 +347,7 @@ def visualize_ccvt_native_size(S, P, V, image_path,
         plt.show()
     return fig, ax
 
+
 # ============================================================
 # B1) All the points on a white background (native size)
 # ============================================================
@@ -353,6 +374,7 @@ def visualize_points_white(P, image_path, point_px=1.0, dpi=100,
     elif show:
         plt.show()
     return fig, ax
+
 
 # ============================================================
 # B2) All the points in yellow over the grayscale image (native size)
@@ -382,12 +404,19 @@ def visualize_points_over_image(P, image_path, point_px=1.0, dpi=100,
     return fig, ax
 
 
-# Main
+########
+# Main #
+########
 def main():
+    start_time = datetime.datetime.now()
+    print(f"Start time: {start_time}")
+
     S, P, C = build_S_P_C_from_image(image_path, n_sites=128, points_per_site=256, invert=True, gamma=1.6)
     print(f"Input shapes S.shape: {S.shape}, P.shape: {P.shape}, C.shape: {C.shape}")
-    V = FastCCVT(S, P, C)
-    # visualize_ccvt(S, P, V, point_size=1, site_size=80, alpha=0.85, figsize=(6,6), dpi=120, title="Fast CCVT Result", show=True)
+    S, V = CCVT_Lloyd(S, P, C, max_outer_iters=30, tol=1e-2, verbose=True)
+    end_time = datetime.datetime.now()
+    print(f"End time: {end_time}")
+    print(f"Duration: {end_time - start_time}")
 
     # After you compute V = FastCCVT(S, P, C)
     visualize_ccvt_native_size(S, P, V, image_path, point_px=1.0, site_px=4.0,

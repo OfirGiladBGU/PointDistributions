@@ -3,6 +3,7 @@ from PIL import Image
 from typing import List, Tuple, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import matplotlib.pyplot as plt
+from PIL import Image
 
 Pair = Tuple[int, int]
 Cluster = List[Pair]
@@ -151,26 +152,43 @@ def SiteSwap(si, sj, S, P, C, V):
 
     # Select exactly C[sj] smallest ΔE to assign to sj (median-threshold selection)
     k = int(C[sj])
+
+    # --- build new mask for sj (exactly k items), with stable tie-break on threshold ---
     if k <= 0:
-        take_j = np.array([], dtype=int)
+        new_mask_j = np.zeros(U.size, dtype=bool)
     elif k >= U.size:
-        take_j = np.arange(U.size, dtype=int)
+        new_mask_j = np.ones(U.size, dtype=bool)
     else:
-        take_j = np.argpartition(delta, k - 1)[:k]
+        T = np.partition(delta, k - 1)[k - 1]     # threshold ΔE
+        lt = delta < T
+        num_lt = int(lt.sum())
+        if num_lt == k:
+            new_mask_j = lt
+        else:
+            # need more from those == T; prefer points already in sj to avoid flip-flop
+            need = k - num_lt
+            eq_idx = np.flatnonzero(delta == T)
+            old_j = set(V[sj])
+            prefer = [i for i in eq_idx if U[i] in old_j]
+            rest   = [i for i in eq_idx if U[i] not in old_j]
+            pick = prefer[:need]
+            if len(pick) < need:
+                pick += rest[:(need - len(pick))]
+            new_mask_j = lt.copy()
+            if pick:
+                new_mask_j[np.array(pick, dtype=int)] = True
 
-    mask_j = np.zeros(U.size, dtype=bool)
-    mask_j[take_j] = True
-
-    # V_j ← selected ; V_i ← U \ selected
-    V[sj] = U[mask_j].tolist()
-    V[si] = U[~mask_j].tolist()
-
-    # optional boolean return (whether anything changed)
-    return True
+    # --- return True only if assignment actually changes ---
+    old_mask_j = np.isin(U, np.asarray(V[sj], dtype=int), assume_unique=False)
+    changed = not np.array_equal(new_mask_j, old_mask_j)
+    if changed:
+        V[sj] = U[new_mask_j].tolist()
+        V[si] = U[~new_mask_j].tolist()
+    return changed
 
 
 # Program 2
-def FastCCVT(S, P, C, max_workers=None, max_iterations=10):
+def FastCCVT(S, P, C, max_workers=None, max_iterations=50):
     # input: sites set S, points set P, and capacity constraints C
     #        where \sigma_(si ∈ S) C(si) = |P|.
     # output: the Voronoi set V
@@ -192,7 +210,7 @@ def FastCCVT(S, P, C, max_workers=None, max_iterations=10):
         Yb = SelectSitePairClusters(S, last_swapped_pairs)
 
         swapped_this_round = []
-
+        swap_count = 0
         for Y in Yb:
             # Run all pairs in this cluster in parallel (disjoint sites ⇒ safe writes to V)
             with ThreadPoolExecutor(max_workers=(max_workers or len(Y) or 1)) as ex:
@@ -203,7 +221,8 @@ def FastCCVT(S, P, C, max_workers=None, max_iterations=10):
                     if did_swap:
                         changed = True
                         swapped_this_round.append((si, sj))
-
+                        swap_count += 1
+        print(f"  performed {swap_count} swaps")
         last_swapped_pairs = swapped_this_round  # feeds cached stage next loop
         if changed:
             stable = False
@@ -240,13 +259,145 @@ def visualize_ccvt(S, P, V, point_size=1, site_size=80, alpha=0.85,
     return fig, ax
 
 
+# --- small helpers ---
+
+def _labels_from_V(V, m):
+    lab = np.empty(m, dtype=np.int32)
+    for s, idxs in enumerate(V):
+        if idxs:
+            lab[np.asarray(idxs, dtype=int)] = s
+    return lab
+
+def _to_pixels(X, W, H):
+    # X[:,0] in [0,1] -> [0,W], X[:,1] in [0,1] -> [0,H]
+    return np.column_stack((X[:,0] * W, X[:,1] * H))
+
+def _make_native_fig(W, H, dpi):
+    fig, ax = plt.subplots(figsize=(W / dpi, H / dpi), dpi=dpi)
+    ax.set_xlim(0, W)
+    ax.set_ylim(H, 0)     # y-down to match image coordinates (top-left origin)
+    ax.axis('off')
+    return fig, ax
+
+def _area_pts2_from_px(px, dpi):
+    # matplotlib.scatter uses area in points^2; convert a desired pixel size
+    return (px * 72.0 / dpi) ** 2
+
+# ============================================================
+# A) Detailed CCVT visualization at native image size
+#    - colors points by site (labels), overlays site markers
+#    - optional: faint grayscale image background
+# ============================================================
+def visualize_ccvt_native_size(S, P, V, image_path,
+                               point_px=1.0, site_px=4.0,
+                               dpi=100, show=True, save_path=None,
+                               overlay_image=False, image_alpha=0.25):
+    """
+    S: (n,2) sites in [0,1]^2
+    P: (m,2) points in [0,1]^2
+    V: list of length n; V[i] are point indices
+    image_path: used to get W,H (and optional background)
+
+    Draws at the *exact* pixel dimensions of the input image.
+    """
+    img = Image.open(image_path).convert('L')
+    W, H = img.size
+
+    Ppx = _to_pixels(P, W, H)
+    Spx = _to_pixels(S, W, H)
+    labels = _labels_from_V(V, P.shape[0])
+
+    fig, ax = _make_native_fig(W, H, dpi)
+
+    if overlay_image:
+        ax.imshow(img, cmap='gray', origin='upper', alpha=image_alpha)
+
+    ax.scatter(Ppx[:, 0], Ppx[:, 1],
+               c=labels, s=_area_pts2_from_px(point_px, dpi),
+               linewidths=0)
+
+    ax.scatter(Spx[:, 0], Spx[:, 1],
+               marker='x', s=_area_pts2_from_px(site_px, dpi),
+               c='k', linewidths=1.0)
+
+    if save_path:
+        fig.savefig(save_path, dpi=dpi, bbox_inches='tight', pad_inches=0)
+        plt.close(fig)
+    elif show:
+        plt.show()
+    return fig, ax
+
+# ============================================================
+# B1) All the points on a white background (native size)
+# ============================================================
+def visualize_points_white(P, image_path, point_px=1.0, dpi=100,
+                           show=True, save_path=None, color='k', alpha=1.0):
+    """
+    Plots all points on white background at the input image’s exact pixel size.
+    """
+    img = Image.open(image_path)
+    W, H = img.size
+    Ppx = _to_pixels(P, W, H)
+
+    fig, ax = _make_native_fig(W, H, dpi)
+    # white background
+    ax.set_facecolor('white')
+
+    ax.scatter(Ppx[:, 0], Ppx[:, 1],
+               c=color, s=_area_pts2_from_px(point_px, dpi),
+               linewidths=0, alpha=alpha)
+
+    if save_path:
+        fig.savefig(save_path, dpi=dpi, bbox_inches='tight', pad_inches=0, facecolor='white')
+        plt.close(fig)
+    elif show:
+        plt.show()
+    return fig, ax
+
+# ============================================================
+# B2) All the points in yellow over the grayscale image (native size)
+# ============================================================
+def visualize_points_over_image(P, image_path, point_px=1.0, dpi=100,
+                                show=True, save_path=None, alpha_points=1.0):
+    """
+    Overlays all points in yellow over the grayscale input image,
+    preserving the original pixel dimensions.
+    """
+    img = Image.open(image_path).convert('L')
+    W, H = img.size
+    Ppx = _to_pixels(P, W, H)
+
+    fig, ax = _make_native_fig(W, H, dpi)
+    ax.imshow(img, cmap='gray', origin='upper')
+
+    ax.scatter(Ppx[:, 0], Ppx[:, 1],
+               c='yellow', s=_area_pts2_from_px(point_px, dpi),
+               linewidths=0, alpha=alpha_points)
+
+    if save_path:
+        fig.savefig(save_path, dpi=dpi, bbox_inches='tight', pad_inches=0)
+        plt.close(fig)
+    elif show:
+        plt.show()
+    return fig, ax
+
+
 # Main
 def main():
-    S, P, C = build_S_P_C_from_image(image_path, n_sites=128, points_per_site=128, invert=True, gamma=1.6)
+    S, P, C = build_S_P_C_from_image(image_path, n_sites=128, points_per_site=256, invert=True, gamma=1.6)
     print(f"Input shapes S.shape: {S.shape}, P.shape: {P.shape}, C.shape: {C.shape}")
     V = FastCCVT(S, P, C)
-    visualize_ccvt(S, P, V, point_size=1, site_size=80, alpha=0.85, figsize=(6,6), dpi=120, title="Fast CCVT Result", show=True)
+    # visualize_ccvt(S, P, V, point_size=1, site_size=80, alpha=0.85, figsize=(6,6), dpi=120, title="Fast CCVT Result", show=True)
 
+    # After you compute V = FastCCVT(S, P, C)
+    visualize_ccvt_native_size(S, P, V, image_path, point_px=1.0, site_px=4.0,
+                               dpi=100, overlay_image=False, show=True, save_path="0.png")
+
+    # (1) All points on white
+    visualize_points_white(P, image_path, point_px=1.0, dpi=100, show=True, save_path="1.png")
+
+    # (2) All points in yellow over grayscale image
+    visualize_points_over_image(P, image_path, point_px=1.0, dpi=100, show=True, save_path="2.png")
 
 if __name__ == "__main__":
     image_path = fr"C:\Users\ofirg\PycharmProjects\PointDistributions\input\Scale.jpg"

@@ -59,14 +59,13 @@ def build_S_P_C_from_image(image_path, n_sites, points_per_site=256, invert=True
 # Program 6
 def Initialization(S, P, C):
     # V ← coherent assignment from P to S, preserving C
-    # S' ← S  // the set of sites with capacity not yet filled
-
-    # Vi ← ∅
     n = S.shape[0]
-    V = [[] for _ in range(n)]
 
     # S' ← S // the set of sites with capacity not yet filled
     S_prime = set(range(n))
+
+    # Vi ← ∅
+    V = [[] for _ in range(n)]
 
     # foreach p ∈ P
     for pi in range(P.shape[0]):
@@ -421,7 +420,7 @@ def main():
     print(f"Start time: {start_time}")
 
     # Algorithm start
-    S, P, C = build_S_P_C_from_image(image_path, n_sites=128, points_per_site=256, invert=True, gamma=1.6)
+    S, P, C = build_S_P_C_from_image(image_path, n_sites=256, points_per_site=256, invert=True, gamma=1.6)
     print(f"Input shapes S.shape: {S.shape}, P.shape: {P.shape}, C.shape: {C.shape}")
     S, V = FastCCVTLloyd(S, P, C, max_outer_iters=30, tol=1e-2, verbose=True)
     # Algorithm end
@@ -443,5 +442,5 @@ def main():
     visualize_points_over_image(P, image_path, point_px=1.0, dpi=100, show=True, save_path=f"{save_path_format}_2.png")
 
 if __name__ == "__main__":
-    image_path = fr"C:\Users\ofirg\PycharmProjects\PointDistributions\input\Plant.png"
+    image_path = fr"C:\Users\ofirg\PycharmProjects\PointDistributions\input\Gray.jpg"
     main()
